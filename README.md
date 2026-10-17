@@ -6,10 +6,10 @@ Two tiny Windows tray icons that show how much of your **Claude** plan limit is 
 
 | Icon | Limit |
 |---|---|
-| ● circle | 5-hour session limit |
-| ■ square | weekly limit |
+| ◔ clock — colored slice shrinks as you use it | 5-hour session limit |
+| 📅 calendar — colored fill drains downward | weekly limit |
 
-- The number is the **% still available**; the fill level shows the same thing visually.
+- The number is the **% still available**; the colored slice / fill shows the same thing visually.
 - Color: green ≥ 50 %, amber 20–49 %, red < 20 %. Grey `?` = data couldn't be loaded.
 - Hover → reset time (e.g. "za 2 d 21 h (po 05:59)").
 - Left click → refresh, double click → open claude.ai/settings/usage, right click → menu.

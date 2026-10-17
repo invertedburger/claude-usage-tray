@@ -47,43 +47,64 @@ function Get-Accent([int]$free) {
     else                  { [System.Drawing.Color]::FromArgb(248, 113, 113) }
 }
 
-# "Nadrzka": tmave telo, zespodu barevna naplen do vysky $free %, cislo s obrysem.
-# $shape: 'circle' (5h session) | 'square' (tyden)
+function New-RoundRect([single]$x, [single]$y, [single]$w, [single]$h, [single]$r) {
+    $p = [System.Drawing.Drawing2D.GraphicsPath]::new(); $d = $r * 2
+    $p.AddArc($x, $y, $d, $d, 180, 90); $p.AddArc($x + $w - $d, $y, $d, $d, 270, 90)
+    $p.AddArc($x + $w - $d, $y + $h - $d, $d, $d, 0, 90); $p.AddArc($x, $y + $h - $d, $d, $d, 90, 90)
+    $p.CloseFigure(); $p
+}
+
+# Ikona s cislem $text a naplni podle $free % (-1 = nezname, bez naplne).
+# $shape: 'circle' = 5h session jako hodiny (vysec ubyva po smeru hodinovych rucicek)
+#         'square' = tyden jako kalendar (krouzky nahore, naplen stoupa zespodu)
 function New-Icon([string]$text, [string]$shape, [int]$free) {
     $sz  = [System.Windows.Forms.SystemInformation]::SmallIconSize.Width
     $bmp = [System.Drawing.Bitmap]::new($sz, $sz)
     $g   = [System.Drawing.Graphics]::FromImage($bmp)
     $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
-    $acc = Get-Accent $free
+    $acc   = Get-Accent $free
+    $body  = [System.Drawing.SolidBrush]::new([System.Drawing.Color]::FromArgb(30, 32, 40))
+    $rim   = [System.Drawing.Pen]::new([System.Drawing.Color]::FromArgb(70, 255, 255, 255), 1)
+    $paper = [System.Drawing.SolidBrush]::new([System.Drawing.Color]::FromArgb(210, 215, 230))
+    $textTop = 0
 
-    $body = [System.Drawing.Drawing2D.GraphicsPath]::new()
     if ($shape -eq 'circle') {
-        $body.AddEllipse(0, 0, $sz - 1, $sz - 1)
+        $g.FillEllipse($body, 0, 0, $sz - 1, $sz - 1)
+        if ($free -gt 0) {
+            $pie = [System.Drawing.SolidBrush]::new($acc)
+            $g.FillPie($pie, [single]0, [single]0, [single]($sz - 1), [single]($sz - 1), [single]-90, [single](360 * $free / 100))
+            $pie.Dispose()
+        }
+        $g.DrawEllipse($rim, 0, 0, $sz - 1, $sz - 1)
     } else {
-        $r = [int]($sz / 5); $d = $r * 2; $w = $sz - 1
-        $body.AddArc(0, 0, $d, $d, 180, 90); $body.AddArc($w - $d, 0, $d, $d, 270, 90)
-        $body.AddArc($w - $d, $w - $d, $d, $d, 0, 90); $body.AddArc(0, $w - $d, $d, $d, 90, 90)
-        $body.CloseFigure()
+        $t    = [int][math]::Round($sz * 0.15)                    # misto pro krouzky
+        $page = New-RoundRect 0 $t ($sz - 1) ($sz - 1 - $t) ([int]($sz / 6))
+        $g.FillPath($body, $page)
+        if ($free -gt 0) {
+            $h    = ($sz - $t) * $free / 100
+            $dark = [System.Drawing.Color]::FromArgb([int]($acc.R * 0.55), [int]($acc.G * 0.55), [int]($acc.B * 0.55))
+            $grad = [System.Drawing.Drawing2D.LinearGradientBrush]::new([System.Drawing.PointF]::new(0, $sz), [System.Drawing.PointF]::new(0, $t), $dark, $acc)
+            $g.SetClip($page)
+            $g.FillRectangle($grad, [single]0, [single]($sz - $h), [single]$sz, [single]$h)
+            $g.ResetClip(); $grad.Dispose()
+        }
+        $header = [int][math]::Round($sz * 0.22) + $t                # svetla hlavicka kalendare
+        $g.SetClip($page); $g.FillRectangle($paper, 0, 0, $sz, $header); $g.ResetClip()
+        $g.DrawPath($rim, $page)
+        $pw = [math]::Max(2, [int]($sz / 8))
+        foreach ($x in [int]($sz * 0.27), [int]($sz * 0.73 - $pw)) {
+            $g.FillRectangle($paper, $x, 0, $pw, $header - 1)
+            $g.FillRectangle($body, $x, $t, $pw, 1)
+        }
+        $page.Dispose()
+        $textTop = $header - 1
     }
-    $bodyBrush = [System.Drawing.SolidBrush]::new([System.Drawing.Color]::FromArgb(30, 32, 40))
-    $g.FillPath($bodyBrush, $body)
-
-    if ($free -gt 0) {
-        $h = $sz * $free / 100
-        $dark = [System.Drawing.Color]::FromArgb([int]($acc.R * 0.55), [int]($acc.G * 0.55), [int]($acc.B * 0.55))
-        $grad = [System.Drawing.Drawing2D.LinearGradientBrush]::new([System.Drawing.PointF]::new(0, $sz), [System.Drawing.PointF]::new(0, 0), $dark, $acc)
-        $g.SetClip($body)
-        $g.FillRectangle($grad, [single]0, [single]($sz - $h), [single]$sz, [single]$h)
-        $g.ResetClip(); $grad.Dispose()
-    }
-    $rim = [System.Drawing.Pen]::new([System.Drawing.Color]::FromArgb(70, 255, 255, 255), 1)
-    $g.DrawPath($rim, $body)
 
     $px = $sz * $(if ($text.Length -ge 3) { 0.42 } else { 0.6 })
     $sf = [System.Drawing.StringFormat]::new()
     $sf.Alignment = $sf.LineAlignment = [System.Drawing.StringAlignment]::Center
     $tp = [System.Drawing.Drawing2D.GraphicsPath]::new()
-    $tp.AddString($text, [System.Drawing.FontFamily]::new('Segoe UI'), [int][System.Drawing.FontStyle]::Bold, [single]$px, [System.Drawing.RectangleF]::new(-1, 0, $sz + 2, $sz + 1), $sf)
+    $tp.AddString($text, [System.Drawing.FontFamily]::new('Segoe UI'), [int][System.Drawing.FontStyle]::Bold, [single]$px, [System.Drawing.RectangleF]::new(-1, $textTop, $sz + 2, $sz - $textTop + 1), $sf)
     $outline = [System.Drawing.Pen]::new([System.Drawing.Color]::FromArgb(200, 0, 0, 0), [single]($sz / 8))
     $outline.LineJoin = [System.Drawing.Drawing2D.LineJoin]::Round
     $g.DrawPath($outline, $tp)
@@ -92,7 +113,7 @@ function New-Icon([string]$text, [string]$shape, [int]$free) {
     $hIcon = $bmp.GetHicon()
     $icon  = [System.Drawing.Icon]::FromHandle($hIcon).Clone()
     [void][Win32.Native]::DestroyIcon($hIcon)
-    $g.Dispose(); $bmp.Dispose(); $body.Dispose(); $bodyBrush.Dispose(); $rim.Dispose(); $sf.Dispose(); $tp.Dispose(); $outline.Dispose()
+    $g.Dispose(); $bmp.Dispose(); $body.Dispose(); $rim.Dispose(); $paper.Dispose(); $sf.Dispose(); $tp.Dispose(); $outline.Dispose()
     $icon
 }
 

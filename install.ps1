@@ -37,7 +37,7 @@ Start-Process $ps -ArgumentList $argLine -WindowStyle Hidden
 
 Write-Host ''
 Write-Host 'Claude Usage Tray installed and running.' -ForegroundColor Green
-Write-Host '  circle = 5-hour limit, square = weekly limit (% left)'
+Write-Host '  clock = 5-hour limit, calendar = weekly limit (% left)'
 Write-Host '  Starts automatically when you log in.'
 Write-Host '  Windows hides new tray icons under the ^ arrow - drag them onto the taskbar.'
 if (-not (Test-Path (Join-Path $env:USERPROFILE '.claude\.credentials.json'))) {
