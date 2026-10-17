@@ -15,28 +15,29 @@ Two tiny Windows tray icons that show how much of your **Claude** plan limit is 
 - Left click → refresh, double click → open claude.ai/settings/usage, right click → menu.
 - Refreshes every 5 minutes. UI text is in Czech.
 
-## Requirements
-
-- Windows 10/11
-- [PowerShell 7](https://learn.microsoft.com/powershell/scripting/install/installing-powershell-on-windows) (`pwsh`)
-- Signed in to [Claude Code](https://claude.com/claude-code) (CLI or desktop app) with a Claude Pro/Max subscription — the script reads the OAuth token from `%USERPROFILE%\.claude\.credentials.json`.
-
 ## Install
 
+**Option A — one line.** Open PowerShell (Win + X → *Terminal*) and paste:
+
 ```powershell
-git clone https://github.com/invertedburger/claude-usage-tray.git
-cd claude-usage-tray
-pwsh -ExecutionPolicy Bypass -File .\install.ps1
+irm https://raw.githubusercontent.com/invertedburger/claude-usage-tray/main/install.ps1 | iex
 ```
 
-This copies the script to `%LOCALAPPDATA%\ClaudeUsageTray`, adds a shortcut to your Startup folder and starts it. Run it again to update.
+**Option B — double-click.** Download [**install.cmd**](https://github.com/invertedburger/claude-usage-tray/releases/latest/download/install.cmd) and run it. Windows SmartScreen may warn about a downloaded file — click *More info → Run anyway*.
+
+Either way it installs to `%LOCALAPPDATA%\ClaudeUsageTray`, **starts automatically on login**, and launches right away. No admin rights needed. Run it again any time to update to the latest version.
 
 Windows 11 hides new tray icons under the **^** arrow — drag them onto the taskbar once and they stay there.
+
+### Requirements
+
+- Windows 10/11 (uses the built-in Windows PowerShell — nothing else to install)
+- Signed in to [Claude Code](https://claude.com/claude-code) (CLI or desktop app) with a Claude Pro/Max subscription — the app reads the OAuth token from `%USERPROFILE%\.claude\.credentials.json`.
 
 ## Uninstall
 
 ```powershell
-pwsh -ExecutionPolicy Bypass -File .\uninstall.ps1
+irm https://raw.githubusercontent.com/invertedburger/claude-usage-tray/main/uninstall.ps1 | iex
 ```
 
 ## How it works

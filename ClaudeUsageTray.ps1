@@ -1,8 +1,9 @@
-#Requires -Version 7
-# Claude usage v system tray - dve ikony s % volneho limitu:
+﻿# Claude usage v system tray - dve ikony s % volneho limitu:
 #   kolecko = 5h session, ctverec = tyden. Naplen ikony = kolik zbyva.
 # Data: https://api.anthropic.com/api/oauth/usage s OAuth tokenem z ~/.claude/.credentials.json
+# Bezi ve Windows PowerShell 5.1 i PowerShell 7. Soubor musi zustat UTF-8 s BOM (kvuli 5.1).
 
+[Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
 Add-Type -AssemblyName System.Windows.Forms, System.Drawing
 Add-Type -Namespace Win32 -Name Native -MemberDefinition '[DllImport("user32.dll")] public static extern bool DestroyIcon(IntPtr h);'
 
@@ -15,7 +16,7 @@ $UsageUrl       = 'https://claude.ai/settings/usage'
 $cs             = [System.Globalization.CultureInfo]::GetCultureInfo('cs-CZ')
 
 function Get-Usage {
-    $c = (Get-Content $CredPath -Raw | ConvertFrom-Json).claudeAiOauth
+    $c = (Get-Content $CredPath -Raw -Encoding UTF8 | ConvertFrom-Json).claudeAiOauth
     Invoke-RestMethod -Uri 'https://api.anthropic.com/api/oauth/usage' -TimeoutSec 15 -Headers @{
         Authorization    = "Bearer $($c.accessToken)"
         'anthropic-beta' = 'oauth-2025-04-20'
