@@ -124,27 +124,54 @@ function Set-Tray($tray, [System.Drawing.Icon]$icon, [string]$text) {
     $tray.Text = if ($text.Length -gt 127) { $text.Substring(0, 127) } else { $text }
 }
 
+$script:last    = $null   # posledni uspesna odpoved API
+$script:lastAt  = $null   # kdy naposledy uspesna
+$script:retryAt = [DateTime]::MinValue  # nevolat API drive nez tohle (po 429)
+
+function Show-Usage($u) {
+    $sFree  = [math]::Max(0, 100 - [int][math]::Round($u.five_hour.utilization))
+    $wFree  = [math]::Max(0, 100 - [int][math]::Round($u.seven_day.utilization))
+    $sReset = ConvertTo-LocalTime $u.five_hour.resets_at
+    $wReset = ConvertTo-LocalTime $u.seven_day.resets_at
+
+    Set-Tray $traySession (New-Icon "$sFree" 'circle' $sFree) "Claude 5h limit: $sFree % volné`nReset $(Format-Reset $sReset)"
+    Set-Tray $trayWeek (New-Icon "$wFree" 'square' $wFree) "Claude týdenní limit: $wFree % volné`nReset $(Format-Reset $wReset)"
+
+    $miSession.Text = "5h limit: $sFree % volné, reset $(Format-Reset $sReset)"
+    $miWeek.Text    = "Týden: $wFree % volné, reset $(Format-Reset $wReset)"
+    $miUpdated.Text = 'Aktualizováno ' + $script:lastAt.ToString('HH:mm')
+}
+
 function Invoke-Refresh {
+    if ((Get-Date) -lt $script:retryAt) { return }   # po 429 pockame
     try {
-        $u = Get-Usage
-        $sFree  = [math]::Max(0, 100 - [int][math]::Round($u.five_hour.utilization))
-        $wFree  = [math]::Max(0, 100 - [int][math]::Round($u.seven_day.utilization))
-        $sReset = ConvertTo-LocalTime $u.five_hour.resets_at
-        $wReset = ConvertTo-LocalTime $u.seven_day.resets_at
-
-        Set-Tray $traySession (New-Icon "$sFree" 'circle' $sFree) "Claude 5h limit: $sFree % volné`nReset $(Format-Reset $sReset)"
-        Set-Tray $trayWeek (New-Icon "$wFree" 'square' $wFree) "Claude týdenní limit: $wFree % volné`nReset $(Format-Reset $wReset)"
-
-        $miSession.Text = "5h limit: $sFree % volné, reset $(Format-Reset $sReset)"
-        $miWeek.Text    = "Týden: $wFree % volné, reset $(Format-Reset $wReset)"
-        $miUpdated.Text = 'Aktualizováno ' + (Get-Date).ToString('HH:mm')
+        $script:last   = Get-Usage
+        $script:lastAt = Get-Date
+        Show-Usage $script:last
     } catch {
-        $msg = $_.Exception.Message
-        $code = try { [int]$_.Exception.Response.StatusCode } catch { 0 }
-        if ($code -eq 401) { $msg = 'Token vypršel – otevři Claude (Code/Desktop), obnoví se sám.' }
-        Set-Tray $traySession (New-Icon '?' 'circle' -1) "Claude usage – chyba:`n$msg"
-        Set-Tray $trayWeek (New-Icon '?' 'square' -1) "Claude usage – chyba:`n$msg"
-        $miUpdated.Text = 'Chyba: ' + $msg
+        $resp = $_.Exception.Response
+        $code = try { [int]$resp.StatusCode } catch { 0 }
+        if ($code -eq 429) {
+            # Rate limit: pockat aspon 15 min (nebo Retry-After), zatim ukazat posledni data
+            $wait = 15
+            $ra = try { [int]$resp.Headers['Retry-After'] } catch { 0 }
+            if ($ra -gt 0) { $wait = [math]::Max(5, [math]::Ceiling($ra / 60)) }
+            $script:retryAt = (Get-Date).AddMinutes($wait)
+            $msg = "API limit – další pokus v $($script:retryAt.ToString('HH:mm'))"
+        } elseif ($code -eq 401) {
+            $msg = 'Token vypršel – otevři Claude (Code/Desktop), obnoví se sám.'
+        } else {
+            $msg = $_.Exception.Message
+        }
+        if ($script:last) {
+            # mame aspon posledni data - ukaz je a jen poznamenej chybu
+            Show-Usage $script:last
+            $miUpdated.Text = "$msg (data z $($script:lastAt.ToString('HH:mm')))"
+        } else {
+            Set-Tray $traySession (New-Icon '?' 'circle' -1) "Claude usage – chyba:`n$msg"
+            Set-Tray $trayWeek (New-Icon '?' 'square' -1) "Claude usage – chyba:`n$msg"
+            $miUpdated.Text = 'Chyba: ' + $msg
+        }
     }
 }
 
